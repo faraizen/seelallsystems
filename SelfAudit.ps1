@@ -22,22 +22,36 @@ function Write-ColorOutput($ForegroundColor) {
 # Fungsi untuk mendapatkan password WiFi yang tersimpan
 function Show-WiFiPasswords {
     Write-ColorOutput Cyan "`n=== MENAMPILKAN PASSWORD WIFI TERSIMPAN ==="
-    $profiles = netsh wlan show profiles | Select-String "Profil semua pengguna" | ForEach-Object { $_ -replace ".*: ", "" }
-    if ($profiles.Count -eq 0) {
+    
+    # Ambil daftar profil WiFi
+    $profilesRaw = netsh wlan show profiles
+    
+    # Cari baris yang mengandung profil (format: "Nama Profile : nilai" atau "All User Profile : nilai")
+    $profileLines = $profilesRaw | Select-String ":[ ]+"
+    
+    if ($profileLines.Count -eq 0) {
         Write-ColorOutput Yellow "Tidak ada profil WiFi ditemukan."
         return
     }
-    foreach ($profile in $profiles) {
-        $details = netsh wlan show profile name="$profile" key=clear
-        $password = $details | Select-String "Konten kunci" | ForEach-Object { $_ -replace ".*: ", "" }
-        if ($password) {
-            Write-Output "$profile : $password"
+    
+    foreach ($line in $profileLines) {
+        # Ambil nama profil setelah tanda titik dua, lalu bersihkan spasi
+        $profileName = ($line -split ":")[1].Trim()
+        
+        # Tampilkan detail profil dengan password
+        $details = netsh wlan show profile name="$profileName" key=clear
+        
+        # Cari baris yang berisi password (Indonesia: "Konten kunci", Inggris: "Key Content")
+        $passwordLine = $details | Select-String "Konten kunci|Key Content"
+        
+        if ($passwordLine) {
+            $password = ($passwordLine -split ":")[1].Trim()
+            Write-Output "$profileName : $password"
         } else {
-            Write-Output "$profile : (tanpa password atau tersembunyi)"
+            Write-Output "$profileName : (tanpa password atau tersembunyi)"
         }
     }
 }
-
 # Fungsi untuk menampilkan proses mencurigakan (berdasarkan nama umum malware)
 function Show-SuspiciousProcesses {
     Write-ColorOutput Cyan "`n=== MEMERIKSA PROSES MENCURIGAKAN ==="
